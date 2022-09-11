@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+	position: absolute;
+	top: 0px;
+	width: 100%;
+	padding: 10px;
+	text-align: center;
+	color: #ffff00
+}
+
+body {
+	overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+<div id="info">Cards Maze Ver.1</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+var camera, scene, renderer;
+var player;
+var cells = [];
+
+var walkState = ['outward', 'ccw', 'inward', 'cw'];
+var index = 0;
+var R = 0;
+var deltaTheta = 0;
+
+const RR = 12;
+const TT = 20;	// must 4n
+var path = [
+	['ccw', 0, 0],	['outward', 1, 0],	['cw', 1, 18],	['outward', 2, 18],	['ccw', 2, 5],	['outward', 4, 5],
+	['ccw', 4, 8],	['inward', 2, 8],	['cw', 2, 6],	['inward', 1, 6],	['ccw', 1, 10],	['outward', 6, 10],
+	['cw', 6, 7],	['outward', 7, 7],	['cw', 7, 3],	['inward', 5, 3],	['ccw', 5, 4],	['inward', 4, 4],
+	['cw', 4, 1],	['outward', 7, 1],	['cw', 7, 16],	['inward', 5, 16],	['cw', 5, 13],	['inward', 3, 13],
+	['cw', 3, 12],	['outward', 8, 12],	['cw', 8, 9],	['inward', 7, 9],	['cw', 7, 8],	['outward', 9, 8],
+	['cw', 9, 6],	['outward', 10, 6],	['cw', 10, 2],	['inward', 9, 2],	['ccw', 9, 3],	['inward', 8, 3],
+	['cw', 8, 19],	['outward', 9, 19],	['cw', 9, 16],	['inward', 8, 16],	['cw', 8, 13],	['outward', 10, 13],
+	['cw', 10, 8],	['outward', 11, 8],	['cw', 11, 3]
+];
+
+//	start from x-axis
+var isoR = [];
+
+//	start from x-axis
+var isoTheta = [];
+
+class Cell {
+	constructor() {
+		this.color = "white";
+	}
+
+	floodfill(i, j) {
+		if (this.color === 'gray') return;
+
+		this.color = 'gray';
+
+		console.log(i, j, this.color);
+
+		if (isoR[i][j] === 0 && i != 0) cells[i - 1][j].floodfill(i - 1, j);
+
+		if (isoR[i + 1][j] === 0) cells[i + 1][j].floodfill(i + 1, j);
+
+		if (isoTheta[j][i] === 0) cells[i][(j - 1 + isoTheta.length) % isoTheta.length].floodfill(i, (j - 1 + isoTheta.length) % isoTheta.length);
+
+		if (isoTheta[(j + 1) % isoTheta.length][i] === 0) cells[i][(j + 1) % isoTheta.length].floodfill(i, (j + 1) % isoTheta.length);
+	}
+}
+
+init();
+animate();
+
+function onWindowResize() {
+
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	camera.aspect = width / height;
+	camera.updateProjectionMatrix();
+	renderer.setSize(width, height);
+}
+
+function buildMaze() {
+	//	radius wall
+	for (var r = 0; r < isoR.length; r++) {
+		for (var theta = 0; theta < isoTheta.length; theta++) {
+			if (isoR[r][theta] == 1) {
+				let geometry = new THREE.CylinderGeometry(50 * (r + 1), 50 * (r + 1), 20, 32, 1, true, 2 * Math.PI / isoTheta.length * (theta + isoTheta.length / 4), 2 * Math.PI / isoTheta.length);
+				let material = new THREE.MeshBasicMaterial({
+					side: THREE.DoubleSide
+				});
+				let maze = new THREE.Mesh(geometry, material);
+				maze.position.y = 10;
+				scene.add(maze);
+			}
+		}
+	}
+
+	//	theta wall
+	for (var theta = 0; theta < isoTheta.length; theta++) {
+		for (var r = 0; r < isoR.length - 1; r++) {
+			if (isoTheta[theta][r] == 1) {
+				let geometry = new THREE.PlaneGeometry(50, 20);
+				let material = new THREE.MeshBasicMaterial({
+					side: THREE.DoubleSide
+				});
+				let plane = new THREE.Mesh(geometry, material);
+				plane.rotation.y = 2 * Math.PI / isoTheta.length * theta;
+				plane.position.y = 10;
+				plane.position.x = (25 + 50 * (r + 1)) * Math.cos(2 * Math.PI / isoTheta.length * theta);
+				plane.position.z = (25 + 50 * (r + 1)) * Math.sin(-2 * Math.PI / isoTheta.length * theta);
+				scene.add(plane);
+			}
+		}
+	}
+
+	//	cell array
+	for (var i = 0; i < isoR.length - 1; i++) {
+		let c0 = [];
+		for (var j = 0; j < isoTheta.length; j++) {
+			let c = new Cell();
+			c0.push(c);
+		}
+		cells.push(c0);
+	}
+}
+
+function onKeydown(event) {
+
+	if (event.key == "ArrowLeft") {
+		if (R === 0)
+			deltaTheta += 1;
+		else
+			index = (index + 1) % 4;
+	}
+	if (event.key == "ArrowRight") {
+		if (R === 0)
+			deltaTheta -= 1;
+		else
+			index = (index - 1 + 4) % 4;
+	}
+	if (event.key == "ArrowUp") {
+		switch (walkState[index]) {
+			case 'ccw':
+				deltaTheta += 1 / R;
+				break;
+			case 'cw':
+				deltaTheta -= 1 / R;
+				break;
+			case 'outward':
+				R += 1;
+				break;
+			case 'inward':
+				if (R === 0) {
+					R += 1;
+					index -= 2;
+					deltaTheta += isoTheta.length;
+				} else
+					R -= 1;
+			break;
+		}
+	}
+
+	if (R > isoTheta.length - 1) R--;
+
+	player.position.x = (25 * R) * Math.cos(2 * Math.PI / isoTheta.length / 2 * deltaTheta);
+	player.position.z = (25 * R) * Math.sin(-2 * Math.PI / isoTheta.length / 2 * deltaTheta);
+
+	player.rotation.y = Math.PI / isoTheta.length * deltaTheta + (Math.PI / 2 * index);
+
+	console.log("R = "+R, " deltaTheta = "+deltaTheta);
+	console.log("x.ceil = "+Math.ceil(player.position.x), " z.ceil = "+Math.ceil(player.position.z));
+	console.log(Math.cos(2 * Math.PI / isoTheta.length / 2 * deltaTheta));
+	//console.log((Math.floor(deltaTheta - (1 / R)) % (isoTheta.length * 2) + isoTheta.length) % isoTheta.length);
+}
+
+function setPath(s_i, s_j, e_i, e_j){
+
+	var i = s_i, j = s_j, a = 0;
+	isoR[s_i][s_j] = 0;
+	while (i !== e_i || j !== e_j){
+		while (path[a][1] !== i || path[a][2] !== j){
+			if (path[a][0] === 'ccw'){
+				isoTheta[(j + 1) % isoTheta.length][i] = 0;
+				j = (j + 1) % isoTheta.length;
+			}
+			if (path[a][0] === 'cw'){
+				isoTheta[j][i] = 0;
+				j = (j - 1 + isoTheta.length) % isoTheta.length;
+			}
+			if (path[a][0] === 'outward'){
+				isoR[i + 1][j] = 0;
+				i++;
+			}
+			if (path[a][0] === 'inward'){
+				isoR[i][j] = 0;
+				i--;
+			}
+			console.log(i, j);
+		}
+		console.log('---------------------------------------------------------------------------');
+		a++;
+	}
+	isoR[i+1][j] = 0;
+}
+
+function init() {
+
+	scene = new THREE.Scene();
+
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.setClearColor(0x888888);
+	document.body.appendChild(renderer.domElement);
+
+	camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000000);
+	camera.position.set(0, 500, 700);
+	let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+	window.addEventListener('resize', onWindowResize, false);
+	window.addEventListener('keydown', onKeydown);
+	////////////////////////////////////////////////////////////////
+	var gridXZ = new THREE.GridHelper(400, 40, 'red', 'white');
+	//scene.add(gridXZ);
+	var axes = new THREE.AxesHelper(100);
+	scene.add(axes);
+	
+	//	init maze
+	for (var i = 0; i < RR + 1; i++){
+		var arr = [];
+		for (var j = 0; j < TT; j++){
+			arr.push(1);
+		}
+		isoR.push(arr);
+	}
+	for (var i = 0; i < TT; i++){
+		var arr = [];
+		for (var j = 0; j < RR; j++){
+			arr.push(1);
+		}
+		isoTheta.push(arr);
+	}
+	
+	setPath(0, 16, path[path.length-1][1], path[path.length-1][2]);
+	buildMaze();
+
+	//console.log("isoR", isoR);
+	//console.log("isoTheta", isoTheta);
+	// floodfill
+	/*
+	for (var a = 0; a < isoTheta.length; a++) {
+		if (isoR[0][a] == 0)
+			cells[0][a].floodfill(0, a);
+		console.log('-----------');
+	}
+	console.log('-----------');
+	*/
+	//console.log(isoR);
+
+	const geometry = new THREE.ConeGeometry(5, 20, 32);
+	const material = new THREE.MeshBasicMaterial({
+	color: 0xffff00
+	});
+	player = new THREE.Mesh(geometry, material);
+	player.rotation.z = -Math.PI / 2;
+	//player.rotation.y = Math.PI / isoTheta.length;
+	scene.add(player);
+}
+
+function animate() {
+
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+
+  renderer.render(scene, camera);
+}
+
+
+</script>
+</body>
+
+</html>

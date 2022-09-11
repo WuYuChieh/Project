@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+
+</style>
+<script type="importmap">
+{
+    "imports": {
+        "three": "./three.module.js",
+		"controls": "./OrbitControls.js"
+    }
+}
+</script>
+
+</head>
+
+<body> 
+<div id="info">Cards Maze Ver.0</div>
+
+<script type="module">
+import {init, animate} from "./main.js";
+
+init();
+animate();
+
+</script>
+</body>
+
+</html>
