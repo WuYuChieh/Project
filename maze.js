@@ -44,7 +44,7 @@ function buildMaze() {
 		};
 		
 		let geometry = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, shapeSettings), new THREE.MeshBasicMaterial({
-			color: "pink"
+			color: 0x003060
 		}));
 		geometry.rotation.x = -Math.PI / 2;
 		
@@ -57,16 +57,16 @@ function buildMaze() {
   for (var theta = 0; theta < isoTheta.length; theta++) {
     for (var r = 0; r < isoR.length - 1; r++) {
       if (isoTheta[theta][r] == 1) {
-        let geometry = new THREE.BoxGeometry(50+6, 10, 10);
+        let geometry = new THREE.BoxGeometry(50+6, 10, 8);
         let material = new THREE.MeshBasicMaterial({
-			color: "pink"
+			color: 0x003060
         });
-        let plane = new THREE.Mesh(geometry, material);
-        plane.rotation.y = 2 * Math.PI / isoTheta.length * theta;
-        plane.position.y = 5;
-        plane.position.x = (25 + 50 * (r + 1)) * Math.cos(2 * Math.PI / isoTheta.length * theta);
-        plane.position.z = (25 + 50 * (r + 1)) * Math.sin(-2 * Math.PI / isoTheta.length * theta);
-        scene.add(plane);
+        let wall = new THREE.Mesh(geometry, material);
+        wall.rotation.y = 2 * Math.PI / isoTheta.length * theta;
+        wall.position.y = 5;
+        wall.position.x = (25 + 50 * (r + 1)) * Math.cos(2 * Math.PI / isoTheta.length * theta);
+        wall.position.z = (25 + 50 * (r + 1)) * Math.sin(-2 * Math.PI / isoTheta.length * theta);
+        scene.add(wall);
       }
     }
   }
